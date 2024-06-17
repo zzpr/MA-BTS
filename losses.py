@@ -95,64 +95,6 @@ class CoralLoss(nn.Module):
         return loss
 
 
-class OptimalTransportLoss(nn.Module):
-    def __init__(self):
-        super(OptimalTransportLoss, self).__init__()
-
-    def forward(self, x, y):
-        """
-        计算最优传输损失
-        参数:
-        - x: 第一个分布的样本，维度为 (n_samples_x, n_features)
-        - y: 第二个分布的样本，维度为 (n_samples_y, n_features)
-        返回:
-        - loss: 最优传输损失
-        """
-        # 计算成本矩阵
-        M = ot.dist(x.cpu().numpy(), y.cpu().numpy())
-        M /= M.max()
-
-        # 均匀分布
-        a, b = np.ones((len(x),)) / len(x), np.ones((len(y),)) / len(y)
-
-        # 计算最优传输矩阵
-        transport_matrix = ot.emd(a, b, M)
-
-        # 计算损失
-        loss = np.sum(transport_matrix * M)
-
-        return torch.tensor(loss, requires_grad=True)
-
-
-class AffinityKDLoss(nn.Module):
-    def __init__(self):
-        super(AffinityKDLoss, self).__init__()
-
-    def forward(self, s, t):
-        """
-        计算亲和性引导的知识蒸馏损失，适用于2D图像
-        :param s: 源域分支的2D特征映射或logits列表，每个元素的形状可以是 (batch_size, channels, height, width)
-        :param t: 目标域分支的2D特征映射或logits列表，每个元素的形状可以是 (batch_size, channels, height, width)
-        """
-        kd_losses = 0
-
-        diagonal_matrix = torch.eye(5)
-        diagonal_matrix[diagonal_matrix == 0] = 0.01
-
-        for i, s_item in enumerate(s):
-            for j, t_item in enumerate(t):
-                if s_item.shape != t_item.shape:
-                    t_item = F.interpolate(t_item, size=s_item.shape[-2:], mode='bilinear', align_corners=False)                         
-                _loss = torch.mean(torch.abs(s_item - t_item).pow(2), (2,3))    # feature
-                score = torch.sum(s_item * t_item, (2,3)) / (torch.norm(torch.flatten(s_item,2), dim=(2)) * torch.norm(torch.flatten(t_item,2), dim=(2)) + 1e-40)   # a
-                score = (score + 1)/2
-                _score = score / torch.unsqueeze(torch.sum(score,1),1)
-                kd_loss = _score * _loss
-                kd_losses += kd_loss.mean()
-        
-        return torch.mean(kd_losses) * diagonal_matrix
-    
-
 class KLDivergenceLoss(nn.Module):
     def __init__(self):
         super(KLDivergenceLoss, self).__init__()
