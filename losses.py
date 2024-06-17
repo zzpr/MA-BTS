@@ -47,7 +47,6 @@ class GANLoss(nn.Module):
 #         return bce + dice
 
 
-# # 原版
 class BCEDiceLoss(nn.Module):
     def __init__(self):
         super(BCEDiceLoss, self).__init__()
@@ -73,24 +72,16 @@ class CoralLoss(nn.Module):
         super(CoralLoss, self).__init__()
 
     def forward(self, source_features, target_features):
-        """
-        :param source_features: 形状为 (batch_size, feature_dim) 的张量
-        :param target_features: 形状为 (batch_size, feature_dim) 的张量
-        """
-        # 计算源特征和目标特征的协方差矩阵
         d = source_features.size(1)
         
-        # 减去均值
         source_mean = torch.mean(source_features, dim=0, keepdim=True)
         target_mean = torch.mean(target_features, dim=0, keepdim=True)
         source_centered = source_features - source_mean
         target_centered = target_features - target_mean
         
-        # 计算协方差
         cov_source = torch.mm(source_centered.t(), source_centered) / (source_features.size(0) - 1)
         cov_target = torch.mm(target_centered.t(), target_centered) / (target_features.size(0) - 1)
         
-        # 计算源协方差矩阵和目标协方差矩阵之间的弗罗贝尼乌斯范数
         loss = torch.norm(cov_source - cov_target, p='fro') / (4 * d * d)
         return loss
 
@@ -100,21 +91,9 @@ class KLDivergenceLoss(nn.Module):
         super(KLDivergenceLoss, self).__init__()
 
     def forward(self, logit1, logit2):
-        """
-        计算两组logit之间的KL散度。
-
-        参数:
-        logit1 (torch.Tensor): 第一组logit。
-        logit2 (torch.Tensor): 第二组logit。
-
-        返回值:
-        torch.Tensor: 两个分布之间的KL散度。
-        """
-
-        # 使用log_softmax将logit1转换为对数概率分布，使用softmax将logit2转换为概率分布
+        
         log_prob1 = F.log_softmax(logit1, dim=1)
         prob2 = F.softmax(logit2, dim=1)
 
-        # 计算KL散度，确保使用对数概率和概率
         kl_div = F.kl_div(log_prob1, prob2, reduction='batchmean')
         return kl_div
